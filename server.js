@@ -115,4 +115,4 @@ const port =  5001;
 //   // logger.info(`app listening on port ${port}`);
 // });
 
-export { app };
+export default app;
