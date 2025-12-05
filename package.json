@@ -1,0 +1,21 @@
+
+{
+  "name": "webhook",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "vercel-start":"node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    
+    "express": "^5.1.0",
+    "@prisma/client": "^6.7.0",
+    "prisma": "^6.6.0",
+     "stripe": "^18.1.0"
+  }
+}

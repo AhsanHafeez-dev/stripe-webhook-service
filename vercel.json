@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+        "src":"/(.*)",
+        "dest":"server.js"
+    }
+  ],
+  "env": {
+    "STRIPE_SECRET_KEY": "@secret_key",
+    "STRIPE_WEBHOOK_SECRET": "@webhook",
+    "DATABASE_URL": "@db",
+    "DIRECT_URL":"@direct",
+    "SHADOW_DATABASE_URL":"@shadow",
+    "PORT": "5000"
+  }
+}

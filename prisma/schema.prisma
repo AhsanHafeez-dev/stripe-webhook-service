@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// 
+
+model User {
+  id                  Int           @id @default(autoincrement())
+  userName            String        @unique
+  userEmail           String        @unique
+  password            String
+  role                String
+  liked               Like[]
+  comments            Comment[]
+  refreshToken        String        @default("")
+  verifiyOtp          String        @default("")
+  verifiyOtpExpiresAt BigInt        @default(0)
+  resetOtp            String        @default("")
+  resetOtpExpiresAt   BigInt        @default(0)
+  isAccountVerified   Boolean       @default(false)
+  certificates        Certificate[]
+  quizAttempts        QuizAttempt[] // for QuizAttempt.user
+  submissions         Submission[] // for Submission.student
+  gradedSubmissions   Submission[]  @relation("Grader") // for Submission.grader
+}
+
+/// Core course data
+
+model Course {
+  id                          Int             @id @default(autoincrement())
+  instructorId                String
+  instructorName              String
+  date                        DateTime?       @default(now())
+  title                       String
+  category                    String
+  level                       String
+  primaryLanguage             String
+  subtitle                    String
+  description                 String
+  image                       String
+  welcomeMessage              String
+  pricing                     Float
+  objectives                  String
+  isPublished                 Boolean
+  curriculum                  Lecture[]       @relation("CourseLectures")
+  students                    CourseStudent[] @relation("CourseEnrollments")
+  noOfLectures                Int             @default(1)
+  isFree                      Boolean         @default(false)
+  comments                    Comment[]
+  noOfComments                Int             @default(0)
+  specialization              Specialization? @relation("specializationCourses", fields: [specializationId], references: [id])
+  specializationId            String?
+  noOfStudents                Int             @default(0)
+  noOfStudentsCompletedCourse Int             @default(0)
+  ratings                     Float           @default(0.0)
+  certificates                Certificate[]
+  quizzes                     Quiz[]
+  assignments                 Assignment[]
+  tags String @default("")
+}
+
+/// Individual lectures in a course
+model Lecture {
+  id           Int          @id @default(autoincrement())
+  title        String
+  videoUrl     String
+  publicId     String       @map("public_id")
+  freePreview  Boolean
+  course       Course?      @relation("CourseLectures", fields: [courseId], references: [id])
+  courseId     Int?
+  comment      Comment[]
+  likes        Like[]
+  noOfComments Int          @default(0)
+  noOfLikes    Int          @default(0)
+  module       Module?      @relation(fields: [moduleId], references: [id])
+  moduleId     String?
+  assignments  Assignment[]
+  
+
+  @@index([courseId])
+}
+
+/// Join table: which students are enrolled in which course
+model CourseStudent {
+  id           Int    @id @default(autoincrement())
+  studentId    String
+  studentName  String
+  studentEmail String
+  paidAmount   Float
+  course       Course @relation("CourseEnrollments", fields: [courseId], references: [id])
+  courseId     Int
+  attendance   Float? @default(0)
+
+  @@index([courseId])
+  @@index([studentId])
+}
+
+/// Tracks overall progress per user & course
+model CourseProgress {
+  id                String            @id @default(cuid())
+  userId            String
+  courseId          String
+  completed         Boolean
+  completionDate    DateTime?
+  lectureProgress   LectureProgress[]
+  noOfLecturesViews Int               @default(0)
+
+  @@index([userId, courseId])
+}
+
+/// Progress on each lecture within a course
+model LectureProgress {
+  id               String         @id @default(cuid())
+  lectureId        Int
+  viewed           Boolean
+  dateViewed       DateTime?
+  courseProgress   CourseProgress @relation(fields: [courseProgressId], references: [id])
+  courseProgressId String
+
+  @@index([lectureId])
+}
+
+/// All orders placed by users
+model Order {
+  id                  String   @id @default(cuid())
+  userId              String
+  userName            String
+  userEmail           String
+  orderStatus         String
+  paymentMethod       String
+  paymentStatus       String
+  orderDate           DateTime
+  orderId             String?
+  paymentId           String?
+  payerId             String?
+  instructorId        String
+  instructorName      String
+  courseImage         String
+  courseImagePublicId String   @default("")
+  courseTitle         String
+  courseId            String
+  coursePricing       Float
+  invoiceUrl          String?
+  stripeTransactionId String?
+
+
+  @@index([userId])
+}
+
+/// (Alternative) If you prefer simply listing purchases per user,
+/// you could drop `CourseStudent` and use this instead:
+model StudentCourse {
+  id             String   @id @default(cuid())
+  userId         String
+  courseId       String // foreign key
+  title          String
+  instructorId   String // foreign key
+  instructorName String
+  dateOfPurchase DateTime
+  courseImage    String
+  attendance     Float?   @default(0)
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+model Comment {
+  id String @id @default(cuid())
+
+  comment   Comment?  @relation("CommentToComment", fields: [commentId], references: [id],onDelete: Cascade)
+  commentId String?
+  comments  Comment[] @relation("CommentToComment")
+
+  lecture   Lecture? @relation(fields: [lectureId], references: [id],onDelete: Cascade)
+  lectureId Int?
+
+  course   Course? @relation(fields: [courseId], references: [id])
+  courseId Int?
+
+  likes Like[]
+  text  String
+
+  noOfReplies Int @default(0)
+  noOfLikes   Int @default(0)
+
+  owner   User @relation(fields: [ownerId], references: [id],onDelete: Cascade)
+  ownerId Int
+}
+
+model Like {
+  id String @id @default(cuid())
+
+  lecture   Lecture? @relation(fields: [lectureId], references: [id])
+  lectureId Int?
+
+  comment   Comment? @relation(fields: [commentId], references: [id])
+  commentId String?
+
+  owner   User @relation(fields: [ownerId], references: [id])
+  ownerId Int
+}
+
+model Specialization {
+  id          String   @id @default(cuid())
+  courses     Course[] @relation("specializationCourses")
+  name        String
+  price       Float
+  noOfCoursed Int
+}
+
+model Module {
+  id           String    @id @default(cuid())
+  name         String
+  noOfLectures Int
+  lectures     Lecture[]
+  duration     DateTime?
+}
+
+model Certificate {
+  id String @id @default(cuid())
+
+  course   Course? @relation(fields: [courseId], references: [id])
+  courseId Int?
+
+  user   User? @relation(fields: [userId], references: [id])
+  userId Int?
+
+  certificateUrl String
+}
+
+/// 1. Enumerations
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  FILL_IN_BLANK
+  // add more as needed
+}
+
+enum SubmissionStatus {
+  PENDING
+  GRADED
+}
+
+/// 2. Quiz models
+
+model Quiz {
+  id               String   @id @default(cuid())
+  course           Course   @relation(fields: [courseId], references: [id],onDelete: Cascade)
+  courseId         Int
+  title            String
+  subject          String
+  description      String?
+  difficulty       String
+  timeLimitMin     Int? /// in minutes, null = untimed
+  shuffleQuestions Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  questions Question[]      
+  attempts  QuizAttempt[]
+}
+
+model Question {
+  id     String       @id @default(cuid())
+  quiz   Quiz         @relation(fields: [quizId], references: [id],onDelete: Cascade)
+  quizId String
+  type   String
+  question String
+  points Int          @default(1)
+  hint String
+  options     Option[] /// for MCQ / TRUE_FALSE
+  // for fill-in-blank you can compare against `correctText`
+  correctText String? /// for FILL_IN_BLANK
+  responses   QuestionResponse[]
+}
+
+model Option {
+  id                String             @id @default(cuid())
+  question          Question           @relation(fields: [questionId], references: [id],onDelete: Cascade)
+  questionId        String
+  
+  text              String
+  isCorrect         Boolean            @default(false)
+  questionResponses QuestionResponse[]
+}
+
+/// captures each student’s run at a quiz
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  quiz        Quiz      @relation(fields: [quizId], references: [id],onDelete: Cascade)
+  quizId      String
+  user        User      @relation(fields: [userId], references: [id],onDelete: Cascade)
+  userId      Int
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  totalScore  Float? /// computed after grading
+
+  responses QuestionResponse[]
+}
+
+model QuestionResponse {
+  id         String      @id @default(cuid())
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id],onDelete: Cascade)
+  attemptId  String
+  question   Question    @relation(fields: [questionId], references: [id],onDelete: Cascade)
+  questionId String
+
+  /// one of these will be used depending on question type
+  selectedOption   Option? @relation(fields: [selectedOptionId], references: [id])
+  selectedOptionId String?
+  textAnswer       String?
+
+  scoreAwarded Float? /// assigned by auto‑grader or instructor
+}
+
+/// 3. Assignment models
+
+model Assignment {
+  id        String   @id @default(cuid())
+  course    Course   @relation(fields: [courseId], references: [id],onDelete: Cascade)
+  courseId  Int
+  lecture   Lecture? @relation(fields: [lectureId], references: [id],onDelete: Cascade)
+  lectureId Int? /// tie assignment to a lecture if you want
+
+  title         String
+  description   String?
+  dueDate       DateTime?
+  allowResubmit Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  submissions Submission[]
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id],onDelete: Cascade)
+  assignmentId String
+  student      User             @relation(fields: [studentId], references: [id],onDelete: Cascade)
+  studentId    Int
+  submittedAt  DateTime         @default(now())
+  fileUrls     String[]         @default([]) /// array of S3 URLs, etc.
+  textResponse String? /// for text‑only tasks
+  status       SubmissionStatus @default(PENDING)
+  grade        Float?
+  feedback     String?
+
+  gradedAt DateTime?
+  grader   User?     @relation("Grader", fields: [graderId], references: [id],onDelete: Cascade)
+  graderId Int?
+}
+
+
+enum CuponType{
+  STRIPE_CUPON       // you have created cupon on stripe and applying it now strip cupon cn only be created by admin
+  APPLICATION_CUPON    // you have created cupon on app it will be applied before going to strip page 
+
+
+
+}
+
+
+model Cupon{
+  id String @id @default(cuid())
+  userId Int   //which user created cupon
+  courseId Int   // for which course
+  type CuponType @default(APPLICATION_CUPON)
+  cupon String   // it can either be customer facing applicatipn or prisma cupon to be applied
+}
+
